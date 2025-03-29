@@ -1,0 +1,13 @@
+LICENSE
+README.md
+pyproject.toml
+src/human_brain_atlases/__init__.py
+src/human_brain_atlases.egg-info/PKG-INFO
+src/human_brain_atlases.egg-info/SOURCES.txt
+src/human_brain_atlases.egg-info/dependency_links.txt
+src/human_brain_atlases.egg-info/top_level.txt
+src/human_brain_atlases/atlases/__init__.py
+src/human_brain_atlases/atlases/base.py
+src/human_brain_atlases/atlases/schaefer.py
+src/human_brain_atlases/utils/__init__.py
+src/human_brain_atlases/utils/helpers.py
