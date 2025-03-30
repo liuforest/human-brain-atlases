@@ -1,9 +1,13 @@
 # human-brain-atlases
- Human brain atlas parcellations based on the MNI152 template
+Human brain atlas parcellations based on the MNI152 template
 
 ## Usage
 
 ```python
-from human_brain_atlases import plusplus
+import human_brain_atlases as hba
 
-result = plusplus(1, 2) # returns 3 -- for testing
+# Load the Schaefer atlas with 400 regions of interst
+atlas = hba.atlases.Schaefer(n_rois=400)
+
+# view the dataframe
+atlas.df
