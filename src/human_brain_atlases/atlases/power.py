@@ -79,7 +79,7 @@ class Power:
         # Try to find the file using the package structure
         try:
             xlsx_path = resources.files('human_brain_atlases.data.jonathan_power_2011').joinpath('Neuron_consensus_264.xlsx')
-            print(f"Looking for Excel file at: {xlsx_path}")
+            #print(f"Looking for Excel file at: {xlsx_path}")
             if not os.path.exists(xlsx_path):
                 raise FileNotFoundError(f"File not found at {xlsx_path}")
         except (AttributeError, ModuleNotFoundError, FileNotFoundError):
@@ -118,23 +118,28 @@ class Power:
         pd.DataFrame
             The formatted dataframe
         """
+        
+        
+        
+        
         # drop the individual columns
         df.drop(columns=['mni_coords_x', 'mni_coords_y', 'mni_coords_z'], inplace=True)
 
         # Drop uncertain & cerebellar regions
-        df = df[~df['RSN'].isin(['Uncertain', 'Cerebellar', 'Memory retrieval?'])]
+        df = df[~df['RSN'].isin(['Uncertain', 'Cerebellar', 'Memory retrieval?'])].copy()
+
 
         # Rename columns containing 'somato to 'sensorimotor'
-        df['RSN'] = df['RSN'].apply(lambda entry: 'Sensorimotor' if 'somato' in str(entry).lower() else entry)
+        df.loc[:, 'RSN'] = df['RSN'].apply(lambda entry: 'Sensorimotor' if 'somato' in str(entry).lower() else entry)
 
         # Rename columns containing 'attention' to 'attention'
-        df['RSN'] = df['RSN'].apply(lambda entry: 'Attention' if 'attention' in str(entry).lower() else entry)
+        df.loc[:, 'RSN'] = df['RSN'].apply(lambda entry: 'Attention' if 'attention' in str(entry).lower() else entry)
 
         # Change all spaces and dashes to underscore, and lowercase everything
-        df['RSN'] = df['RSN'].apply(lambda entry: str(entry).replace(" ", "_").replace("-", "_").lower())
+        df.loc[:, 'RSN'] = df['RSN'].apply(lambda entry: str(entry).replace(" ", "_").replace("-", "_").lower())
 
         # Rearrange by count of RSN occurrences and ROI
-        df['rsn_count'] = df['RSN'].map(df['RSN'].value_counts())
+        df.loc[:, 'rsn_count'] = df['RSN'].map(df['RSN'].value_counts())
         df = df.sort_values(by=['rsn_count', 'roi_label'], ascending=False).reset_index(drop=True)
         
         # Delete rsn count column
@@ -149,7 +154,7 @@ class Power:
         based on the x-coordinate of the MNI coordinates.
         """
         if not hasattr(self, '_dataframe'):
-            print("Warning: _dataframe not initialized when adding hemisphere labels")
+            #print("Warning: _dataframe not initialized when adding hemisphere labels")
             return
             
         def get_hemisphere(coords):
@@ -176,7 +181,7 @@ class Power:
             Path to the Excel file
         """
         
-        print(f"Loading atlas data from Excel: {excel_path}")
+        #print(f"Loading atlas data from Excel: {excel_path}")
         
         try:
             # First, check if the file exists
@@ -212,9 +217,9 @@ class Power:
                 axis=1
             )
             
-            print(f"Successfully loaded Excel with {len(df)} rows")
-            print(f"Columns: {df.columns.tolist()}")
-            print(f"Sample data: \n{df.head()}")
+            #print(f"Successfully loaded Excel with {len(df)} rows")
+            #print(f"Columns: {df.columns.tolist()}")
+            #print(f"Sample data: \n{df.head()}")
             
             self._dataframe = df
             

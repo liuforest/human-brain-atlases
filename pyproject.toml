@@ -10,7 +10,7 @@ where = ["src"]
 
 [project]
 name = "human-brain-atlases"
-version = "0.1.5"
+version = "0.1.6"
 description = "A simple package with a plusplus function"
 readme = "README.md"
 authors = [{name = "liuforest", email = "lshangming@gmail.com"}]
