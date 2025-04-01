@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from nilearn import plotting
 from pathlib import Path
 import os
+from importlib import resources
 
 
 class Power:
@@ -46,144 +47,63 @@ class Power:
         'auditory': 'brown',
         'subcortical': 'gray'
     }
-    
-    def __init__(self, use_custom_formatting=True, data_dir=None):
+    def __init__(self):
         """
         Initialize a Power atlas object.
         
         Parameters
         ----------
-        use_custom_formatting : bool, optional
-            Whether to use custom formatting to clean the data and reduce to 227 ROIs
-            (removing uncertain and cerebellar regions). Default is True.
         data_dir : str or Path, optional
-            Directory containing the atlas data file. If None, uses nilearn's fetch function
-            and looks for the Excel file in a default location.
-            Default is None.
-        
-        Examples
-        --------
-        >>> # Create a Power atlas with default parameters
-        >>> atlas = Power()
-        >>> # Create a Power atlas with raw data (all 264 ROIs)
-        >>> atlas = Power(use_custom_formatting=False)
+            Directory containing the atlas data file. If None, uses the package's
+            built-in data directory. Default is None.
         """
-        self._use_custom_formatting = use_custom_formatting
-        self._data_dir = data_dir
+
+        # # Get root package dir (this points to the atlases directory)
+        # package_dir = os.path.dirname(os.path.abspath(__file__))
         
-        # The default location for the Excel file
-        if data_dir is None:
-            base_dir = Path(__file__).resolve().parent.parent.parent.parent
-            self._data_dir = base_dir / "data" / "jonathan_power_2011"
-        else:
-            self._data_dir = Path(data_dir)
+        # # Go up one level to src/human_brain_atlases 
+        # project_dir = Path(package_dir).parent.parent
         
-        # Load atlas data
-        csv_path = self._data_dir / "atlas.csv"
-        if csv_path.exists():
-            # Use existing CSV file if available
-            self._dataframe = pd.read_csv(csv_path)
+        # # Construct the path to the data file
             
-            # Convert string representation of tuples to actual tuples for mni_coords
-            if 'mni_coords' in self._dataframe.columns:
-                self._dataframe['mni_coords'] = self._dataframe['mni_coords'].apply(
-                    lambda x: tuple(map(float, x.strip('()').split(',')))
-                )
-        else:
-            # Check for Excel file
-            excel_path = self._data_dir / "src" / "Neuron_consensus_264.xlsx"
-            if excel_path.exists():
-                # Use Excel file
-                self._load_from_excel(excel_path)
-            else:
-                # Fall back to nilearn data with minimal information
-                self._load_from_nilearn()
+        # xlsx_path = project_dir / 'data' / 'jonathan_power_2011' / 'Neuron_consensus_264.xlsx'
+        
+        
+        
+        # print(f"Looking for Excel file at: {xlsx_path}")
+        
+        # self._load_from_excel(xlsx_path)
                 
+        xlsx_path = None
+            
+        # Try to find the file using the package structure
+        try:
+            xlsx_path = resources.files('human_brain_atlases.data.jonathan_power_2011').joinpath('Neuron_consensus_264.xlsx')
+            print(f"Looking for Excel file at: {xlsx_path}")
+            if not os.path.exists(xlsx_path):
+                raise FileNotFoundError(f"File not found at {xlsx_path}")
+        except (AttributeError, ModuleNotFoundError, FileNotFoundError):
+            # Fallback to searching relative to package location
+            package_dir = os.path.dirname(os.path.abspath(__file__))  # atlases directory
+            parent_dir = os.path.dirname(package_dir)  # human_brain_atlases directory
+            project_dir = os.path.dirname(os.path.dirname(parent_dir))  # src directory
+            
+            # Look for the file in src/data
+            xlsx_path = os.path.join(project_dir, 'data', 'jonathan_power_2011', 'Neuron_consensus_264.xlsx')
+            print(f"Falling back to: {xlsx_path}")
+            
+        self._load_from_excel(xlsx_path)
+    
+                
+                
+                
+        # Format the atlas data
+        self._dataframe = self._format_atlas(self._dataframe)
+        
         # Add hemisphere labels
         self._add_hemisphere_labels()
-    
-    def _add_hemisphere_labels(self):
-        """
-        Add hemisphere labels (LH = left hemisphere, RH = right hemisphere) 
-        based on the x-coordinate of the MNI coordinates.
         
-        For brain coordinates in MNI space, negative x-values are in the left hemisphere,
-        positive x-values are in the right hemisphere.
-        """
-        def get_hemisphere(coords):
-            x = coords[0]
-            if x < 0:
-                return 'LH'  # Left hemisphere
-            elif x > 0:
-                return 'RH'  # Right hemisphere
-                
-        self._dataframe['hemi'] = self._dataframe['mni_coords'].apply(get_hemisphere)
-    
-    def _load_from_excel(self, excel_path):
-        """
-        Load the Power atlas data from the original Excel file.
         
-        Parameters
-        ----------
-        excel_path : str or Path
-            Path to the Excel file
-        """
-        # Define Excel columns to DataFrame labels mapping
-        cols = {'A': 'ROI',
-                'G': 'mni_x_coord',
-                'H': 'mni_y_coord',
-                'I': 'mni_z_coord',
-                'AF': 'RSN_label_numeric',
-                'AK': 'RSN'}
-
-        # Read the excel file
-        df = pd.read_excel(excel_path, usecols=', '.join(cols.keys()), 
-                          names=cols.values(), header=1, engine='openpyxl')
-        
-        # Apply custom formatting if requested
-        if self._use_custom_formatting:
-            df = self._format_atlas(df)
-        else:
-            # Still create the mni_coords column for consistency
-            df['mni_coords'] = df[['mni_x_coord', 'mni_y_coord', 'mni_z_coord']].apply(tuple, axis=1)
-        
-        self._dataframe = df
-        
-        # Save the processed dataframe for future use
-        csv_path = self._data_dir / "atlas.csv"
-        self._dataframe.to_csv(csv_path, index=False)
-    
-    def _load_from_nilearn(self):
-        """
-        Load the Power atlas data from nilearn with minimal information.
-        Note: This doesn't include network labels, so it's less useful.
-        """
-        # Fetch data from nilearn
-        self._power_atlas = fetch_coords_power_2011()
-        
-        # Create a dataframe from coordinates
-        coords_df = self._power_atlas.rois
-        
-        # Convert to a standard DataFrame
-        df = pd.DataFrame({
-            'ROI': coords_df['roi'].values,
-            'mni_x_coord': coords_df['x'].values,
-            'mni_y_coord': coords_df['y'].values,
-            'mni_z_coord': coords_df['z'].values,
-            # No network information available from nilearn
-            'RSN': ['unknown'] * len(coords_df),
-            'RSN_label_numeric': [0] * len(coords_df)
-        })
-        
-        # Create the mni_coords column
-        df['mni_coords'] = df[['mni_x_coord', 'mni_y_coord', 'mni_z_coord']].apply(tuple, axis=1)
-        
-        # dataframe
-        self._dataframe = df
-        
-        print("Warning: Loading from nilearn doesn't provide network information. "
-              "Please provide the Excel file for full functionality.")
-    
     def _format_atlas(self, df):
         """
         Apply custom formatting to the Power atlas data.
@@ -198,9 +118,8 @@ class Power:
         pd.DataFrame
             The formatted dataframe
         """
-        # Combine x, y, z coords & drop the individual columns
-        df['mni_coords'] = df[['mni_x_coord', 'mni_y_coord', 'mni_z_coord']].apply(tuple, axis=1)
-        df.drop(columns=['mni_x_coord', 'mni_y_coord', 'mni_z_coord'], inplace=True)
+        # drop the individual columns
+        df.drop(columns=['mni_coords_x', 'mni_coords_y', 'mni_coords_z'], inplace=True)
 
         # Drop uncertain & cerebellar regions
         df = df[~df['RSN'].isin(['Uncertain', 'Cerebellar', 'Memory retrieval?'])]
@@ -208,7 +127,7 @@ class Power:
         # Rename columns containing 'somato to 'sensorimotor'
         df['RSN'] = df['RSN'].apply(lambda entry: 'Sensorimotor' if 'somato' in str(entry).lower() else entry)
 
-        # lowercase 'attention'
+        # Rename columns containing 'attention' to 'attention'
         df['RSN'] = df['RSN'].apply(lambda entry: 'Attention' if 'attention' in str(entry).lower() else entry)
 
         # Change all spaces and dashes to underscore, and lowercase everything
@@ -216,13 +135,93 @@ class Power:
 
         # Rearrange by count of RSN occurrences and ROI
         df['rsn_count'] = df['RSN'].map(df['RSN'].value_counts())
-        df = df.sort_values(by=['rsn_count', 'ROI'], ascending=False).reset_index(drop=True)
-                
+        df = df.sort_values(by=['rsn_count', 'roi_label'], ascending=False).reset_index(drop=True)
+        
         # Delete rsn count column
         del df['rsn_count']
 
         return df
 
+                    
+    def _add_hemisphere_labels(self):
+        """
+        Add hemisphere labels (LH = left hemisphere, RH = right hemisphere) 
+        based on the x-coordinate of the MNI coordinates.
+        """
+        if not hasattr(self, '_dataframe'):
+            print("Warning: _dataframe not initialized when adding hemisphere labels")
+            return
+            
+        def get_hemisphere(coords):
+            try:
+                x = coords[0]
+                if x < 0:
+                    return 'LH'  # Left hemisphere
+                elif x > 0:
+                    return 'RH'  # Right hemisphere
+            except (TypeError, IndexError):
+                return 'Unknown'
+                    
+        self._dataframe['hemi'] = self._dataframe['coords'].apply(get_hemisphere)
+    
+            
+
+    def _load_from_excel(self, excel_path):
+        """
+        Load the Power atlas data from the original Excel file.
+        
+        Parameters
+        ----------
+        excel_path : str or Path
+            Path to the Excel file
+        """
+        
+        print(f"Loading atlas data from Excel: {excel_path}")
+        
+        try:
+            # First, check if the file exists
+            if not os.path.exists(excel_path):
+                raise FileNotFoundError(f"Excel file not found at {excel_path}")
+                        
+            # Read the Excel file, skipping the first two rows as they contain headers
+            # The actual column headers are in row 2, and data starts from row 3
+            df_xlsx = pd.read_excel(
+                excel_path,
+                sheet_name=0,  # First sheet
+                header=1,      # Use row at position 1 (2nd row) as the header
+                engine='openpyxl'
+            )
+            
+            # Map specific columns we need
+            df = pd.DataFrame({
+                'roi_label': df_xlsx.iloc[:, 0],                # Column A (ROI)
+                'mni_coords_x': df_xlsx.iloc[:, 6],             # Column G (MNI X)
+                'mni_coords_y': df_xlsx.iloc[:, 7],             # Column H (MNI Y)
+                'mni_coords_z': df_xlsx.iloc[:, 8],             # Column I (MNI Z)
+                'RSN_label_numeric': df_xlsx.iloc[:, 31],       # Column AF
+                'RSN': df_xlsx.iloc[:, 36]                      # Column AK
+            })
+            
+            # Create the coords column (as a tuple)
+            df['coords'] = df.apply(
+                lambda row: (
+                    row['mni_coords_x'], 
+                    row['mni_coords_y'], 
+                    row['mni_coords_z']
+                ), 
+                axis=1
+            )
+            
+            print(f"Successfully loaded Excel with {len(df)} rows")
+            print(f"Columns: {df.columns.tolist()}")
+            print(f"Sample data: \n{df.head()}")
+            
+            self._dataframe = df
+            
+        except Exception as e:
+            print(f"Error reading Excel file: {str(e)}")
+            raise RuntimeError(f"Failed to load Excel file: {str(e)}")
+    
     @property
     def name(self):
         """
@@ -250,14 +249,14 @@ class Power:
         Returns
         -------
         pd.DataFrame
-            DataFrame with columns including 'ROI', 'RSN', 'mni_coords', 'hemi', etc.
+            DataFrame with columns including 'ROI', 'RSN', 'coords', 'hemi', etc.
         
         Examples
         --------
         >>> atlas = Power()
         >>> df = atlas.dataframe
         >>> df.columns
-        Index(['ROI', 'RSN', 'RSN_label_numeric', 'mni_coords', 'hemi'], dtype='object')
+        Index(['ROI', 'RSN', 'RSN_label_numeric', 'coords', 'hemi'], dtype='object')
         """
         return self._dataframe.copy()
     
@@ -280,7 +279,7 @@ class Power:
         >>> coords[0]  # Example coordinate
         (34, 13, 5)
         """
-        return self._dataframe['mni_coords'].tolist()
+        return self._dataframe['coords'].tolist()
     
     @property
     def networks(self):
@@ -498,7 +497,7 @@ class Power:
             raise ValueError("No ROIs match the specified filters")
         
         # Get coordinates for the filtered ROIs, which is a vector of length 227
-        coords = np.array(filtered_df['mni_coords'].tolist())
+        coords = np.array(filtered_df['coords'].tolist())
                 
         # Determine colors based on networks
         if networks is not None and isinstance(networks, (list, tuple)) and len(networks) > 1:
